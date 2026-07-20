@@ -110,23 +110,9 @@ public class ReconnectLogic {
 			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
 		}
 
+		resolveConnectingIfNeeded(client);
 		if (connecting) {
-			if (client.level != null) {
-				// Actually succeeded - onJoin() handles (or already handled) resetting everything.
-				connecting = false;
-				return;
-			}
-			if (client.gui.screen() instanceof ConnectScreen) {
-				return; // still connecting - don't start any countdown until this resolves
-			}
-			connecting = false;
-			if (attemptsSoFar >= DELAY_SECONDS.length) {
-				giveUp(client);
-			} else {
-				ticksUntilNextAttempt = DELAY_SECONDS[attemptsSoFar] * 20;
-				showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + DELAY_SECONDS[attemptsSoFar] + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ").");
-			}
-			return;
+			return; // still waiting on this attempt to resolve
 		}
 
 		if (ticksUntilNextAttempt < 0) {
@@ -138,6 +124,36 @@ public class ReconnectLogic {
 		attemptsSoFar++;
 		if (attemptConnect(client)) {
 			connecting = true;
+		}
+	}
+
+	// A failed connection attempt has no equivalent to pendingDisconnect - there's no event fired
+	// before vanilla creates the new DisconnectedScreen for it (unlike an established connection
+	// being lost, a failed outbound connect never reaches ClientPlayConnectionEvents.DISCONNECT at
+	// all). So relying solely on tick() to notice "no longer on ConnectScreen" risked exactly the
+	// same screen-vs-state-update race pendingDisconnect fixes for the very first disconnect: the
+	// new DisconnectedScreen's init() could run before tick() got a chance to reschedule/give up,
+	// leaving that screen's widgets stuck showing the stale (pre-failure) state. Called both from
+	// tick() every tick, and proactively from DisconnectedScreenMixin's init() the moment a new
+	// DisconnectedScreen appears, so the state is always current by the time widgets are decided.
+	public static void resolveConnectingIfNeeded(Minecraft client) {
+		if (!connecting) {
+			return;
+		}
+		if (client.level != null) {
+			// Actually succeeded - onJoin() handles (or already handled) resetting everything.
+			connecting = false;
+			return;
+		}
+		if (client.gui.screen() instanceof ConnectScreen) {
+			return; // still connecting - don't start any countdown until this resolves
+		}
+		connecting = false;
+		if (attemptsSoFar >= DELAY_SECONDS.length) {
+			giveUp(client);
+		} else {
+			ticksUntilNextAttempt = DELAY_SECONDS[attemptsSoFar] * 20;
+			showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + DELAY_SECONDS[attemptsSoFar] + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ").");
 		}
 	}
 

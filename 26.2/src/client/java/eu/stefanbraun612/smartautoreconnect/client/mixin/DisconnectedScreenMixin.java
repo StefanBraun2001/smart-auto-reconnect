@@ -50,6 +50,11 @@ public abstract class DisconnectedScreenMixin extends Screen {
 			return;
 		}
 
+		// Resolved eagerly here (not just left to tick()) so a failed-connection-attempt screen
+		// always reflects up-to-date state by the time these widgets are decided - see the
+		// comment on resolveConnectingIfNeeded() for why this race exists at all.
+		ReconnectLogic.resolveConnectingIfNeeded(this.minecraft);
+
 		if (ReconnectLogic.isWaiting()) {
 			// Auto-sized to the text (no fixed width), so it can't clip - unlike the fixed-bounds
 			// StringWidget constructor, which clips text that doesn't fit rather than wrapping it.
