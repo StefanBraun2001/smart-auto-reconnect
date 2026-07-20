@@ -5,7 +5,6 @@ import me.shedaniel.autoconfig.AutoConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ConnectScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
@@ -36,10 +35,10 @@ public class ReconnectLogic {
 
 	public static void onJoin(Minecraft client) {
 		lastServerData = client.getCurrentServer();
-		// attemptsSoFar > 0 guards against misattributing a coincidental manual reconnect
-		// that happens to land during the pre-first-attempt wait as a scripted one.
+		// The signal itself is set in attemptConnect(), not here - Fabric doesn't guarantee JOIN
+		// listener order across mods, so setting it reactively on this same JOIN event risked
+		// Smart Auto Attack/Mine checking it before this listener had run.
 		if (ticksUntilNextAttempt >= 0 && attemptsSoFar > 0) {
-			ReconnectSignal.lastAutoReconnectAtMillis = System.currentTimeMillis();
 			showToast(client, "Smart Auto Reconnect", "Reconnected successfully.");
 		}
 		resetSequence();
@@ -53,9 +52,26 @@ public class ReconnectLogic {
 		if (!config.enabled || lastServerData == null) {
 			return;
 		}
-		attemptsSoFar = 0;
-		ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
-		showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
+		// This event can fire off the main render thread (e.g. an involuntary disconnect detected
+		// by the network channel), so both the scheduling state and the toast call need to happen
+		// on the main thread - otherwise the toast silently never renders and the field writes race
+		// against tick() reading them every client tick.
+		client.execute(() -> {
+			attemptsSoFar = 0;
+			ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
+			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
+		});
+	}
+
+	// Manually cancels an in-progress retry sequence (e.g. known server maintenance) - bound to a
+	// keybind rather than a client command since there's no chat box available on the disconnect/
+	// title screen where this is actually needed.
+	public static void cancel(Minecraft client) {
+		if (ticksUntilNextAttempt < 0) {
+			return;
+		}
+		resetSequence();
+		showToast(client, "Smart Auto Reconnect", "Reconnect attempts cancelled.");
 	}
 
 	public static void tick(Minecraft client) {
@@ -82,8 +98,14 @@ public class ReconnectLogic {
 		if (address == null) {
 			return;
 		}
-		Screen parent = client.gui.screen() != null ? client.gui.screen() : new TitleScreen();
-		ConnectScreen.startConnecting(parent, client, address, lastServerData, false, null);
+		// Set before the connection attempt even starts (not on the later JOIN success) so it's
+		// already visible to every mod's JOIN listener by the time one actually fires, regardless
+		// of cross-mod listener order.
+		ReconnectSignal.lastAutoReconnectAtMillis = System.currentTimeMillis();
+		// Always a fresh TitleScreen, never the currently-shown screen - reusing it would chain
+		// each failed attempt's DisconnectedScreen onto the previous one's "Back" target, leaving
+		// a stack of error screens the player has to click through one at a time.
+		ConnectScreen.startConnecting(new TitleScreen(), client, address, lastServerData, false, null);
 	}
 
 	private static void giveUp(Minecraft client) {

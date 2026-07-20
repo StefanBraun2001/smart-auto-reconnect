@@ -2,5 +2,8 @@
 	"text.autoconfig.smartautoreconnect.title": "Smart Auto Reconnect",
 
 	"text.autoconfig.smartautoreconnect.option.enabled": "Enabled",
-	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "When on (default), an involuntary disconnect (server kick, timeout, connection loss - not you pressing the Disconnect button yourself) triggers up to 5 reconnect attempts: 30 seconds after disconnecting, then 50, 70, 90, and 110 seconds after each failed attempt. Gives up and notifies you if all 5 fail. Only applies to direct-connect/server-list multiplayer, not Realms or LAN worlds."
+	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "When on (default), an involuntary disconnect (server kick, timeout, connection loss - not you pressing the Disconnect button yourself) triggers up to 5 reconnect attempts: 30 seconds after disconnecting, then 50, 70, 90, and 110 seconds after each failed attempt. Gives up and notifies you if all 5 fail. Only applies to direct-connect/server-list multiplayer, not Realms or LAN worlds.",
+
+	"key.category.smartautoreconnect.main": "Smart Auto Reconnect",
+	"key.smartautoreconnect.cancel": "Cancel reconnect attempts"
 }
