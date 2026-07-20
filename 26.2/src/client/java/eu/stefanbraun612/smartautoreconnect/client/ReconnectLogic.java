@@ -150,7 +150,16 @@ public class ReconnectLogic {
 		}
 		connecting = false;
 		if (attemptsSoFar >= DELAY_SECONDS.length) {
-			giveUp(client);
+			if (manualOneOff) {
+				// Not a real give-up (attemptsSoFar only reads as "maxed out" because
+				// reconnectNow() reuses that value for its one-off attempt) - reusing giveUp()'s
+				// "Gave up after 5 failed attempts" wording here would be bogus, since this was
+				// just the one attempt the player asked for.
+				resetSequence();
+				showToast(client, "Smart Auto Reconnect", "Manual reconnect attempt failed.");
+			} else {
+				giveUp(client);
+			}
 		} else {
 			ticksUntilNextAttempt = DELAY_SECONDS[attemptsSoFar] * 20;
 			showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + DELAY_SECONDS[attemptsSoFar] + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ").");
@@ -180,7 +189,6 @@ public class ReconnectLogic {
 	private static void giveUp(Minecraft client) {
 		resetSequence();
 		showToast(client, "Smart Auto Reconnect", "Gave up after " + DELAY_SECONDS.length + " failed attempts.");
-		client.gui.hud.getChat().addClientSystemMessage(Component.literal("Smart Auto Reconnect: gave up after " + DELAY_SECONDS.length + " failed attempts."));
 		playGiveUpSound(client);
 	}
 
