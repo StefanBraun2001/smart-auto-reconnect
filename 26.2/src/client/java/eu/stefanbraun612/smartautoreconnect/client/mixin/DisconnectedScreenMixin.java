@@ -33,11 +33,17 @@ public abstract class DisconnectedScreenMixin extends Screen {
 			return;
 		}
 
-		int widgetWidth = 200;
-		int x = (this.width - widgetWidth) / 2;
+		int buttonWidth = 200;
+		int buttonX = (this.width - buttonWidth) / 2;
 		int y = this.height - 28;
 
-		StringWidget statusLabel = new StringWidget(x, y - 12, widgetWidth, 10,
+		// Wider than the button and centered on its own - the status text ("Retrying (attempt
+		// X/5)...") doesn't fit in 200px at this font size, and StringWidget clips rather than
+		// wraps once text exceeds its bounds.
+		int labelWidth = Math.min(300, this.width - 40);
+		int labelX = (this.width - labelWidth) / 2;
+
+		StringWidget statusLabel = new StringWidget(labelX, y - 12, labelWidth, 10,
 				Component.literal(ReconnectLogic.statusText()), this.font);
 		this.addRenderableWidget(statusLabel);
 
@@ -46,7 +52,7 @@ public abstract class DisconnectedScreenMixin extends Screen {
 			button.active = false;
 			button.setMessage(Component.literal("Cancelled"));
 			statusLabel.setMessage(Component.literal("Smart Auto Reconnect: cancelled."));
-		}).bounds(x, y, widgetWidth, 20).build();
+		}).bounds(buttonX, y, buttonWidth, 20).build();
 		this.addRenderableWidget(cancelButton);
 	}
 }

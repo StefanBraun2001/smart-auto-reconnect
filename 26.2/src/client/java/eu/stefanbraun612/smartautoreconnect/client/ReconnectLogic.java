@@ -137,11 +137,12 @@ public class ReconnectLogic {
 		return ticksUntilNextAttempt >= 0;
 	}
 
-	// Used by DisconnectedScreenMixin for the status label text.
+	// Used by DisconnectedScreenMixin for the status label text - kept short since the label is
+	// clipped (with a trailing "...") rather than wrapped once it runs out of horizontal room.
 	public static String statusText() {
 		if (attemptsSoFar >= DELAY_SECONDS.length) {
 			return "Giving up soon...";
 		}
-		return "Smart Auto Reconnect: retrying (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
+		return "Retrying (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
 	}
 }
