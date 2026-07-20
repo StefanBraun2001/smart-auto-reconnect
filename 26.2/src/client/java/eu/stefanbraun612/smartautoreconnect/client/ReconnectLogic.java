@@ -17,9 +17,6 @@ import net.minecraft.sounds.SoundEvent;
 public class ReconnectLogic {
 	// Gap (seconds) before each successive attempt: 30, then +20 each time (50, 70, 90, 110).
 	private static final int[] DELAY_SECONDS = {30, 50, 70, 90, 110};
-	// How long to wait after the final attempt before declaring the whole sequence failed -
-	// there's no attempt afterward to naturally trigger this check, so it needs its own timer.
-	private static final int GIVE_UP_GRACE_SECONDS = 20;
 	// Toasts render on top of any screen (disconnect screen, title screen, ConnectScreen), unlike
 	// chat messages which only ever show up once back in a world's HUD - needed since the whole
 	// retry sequence happens while the player is stuck on exactly those screens.
@@ -30,8 +27,16 @@ public class ReconnectLogic {
 	// singleplayer/LAN, which are intentionally out of scope (no meaningful "reconnect" there).
 	private static ServerData lastServerData = null;
 
-	private static int ticksUntilNextAttempt = -1; // -1 = no retry sequence in progress
+	private static int ticksUntilNextAttempt = -1; // -1 = not waiting for a scheduled attempt
 	private static int attemptsSoFar = 0;
+	// True for the whole time a ConnectScreen attempt is in flight - the countdown for the next
+	// attempt only starts once this resolves (success or failure), not when this one started, so
+	// a slow/hanging connection attempt (e.g. a dead server taking a long time to time out) can't
+	// eat into the next attempt's displayed delay.
+	private static boolean connecting = false;
+	// Distinguishes reconnectNow()'s one-off attempt (after already giving up) from a real 5th
+	// auto-attempt for toast wording - both set attemptsSoFar to DELAY_SECONDS.length.
+	private static boolean manualOneOff = false;
 
 	// Set from onDisconnect(), consumed by tick(). Deliberately just a plain flag rather than
 	// scheduling work via Minecraft's own client.execute() task queue - for an involuntary
@@ -46,7 +51,7 @@ public class ReconnectLogic {
 		// The signal itself is set in attemptConnect(), not here - Fabric doesn't guarantee JOIN
 		// listener order across mods, so setting it reactively on this same JOIN event risked
 		// Smart Auto Attack/Mine checking it before this listener had run.
-		if (ticksUntilNextAttempt >= 0 && attemptsSoFar > 0) {
+		if (connecting && attemptsSoFar > 0) {
 			showToast(client, "Smart Auto Reconnect", "Reconnected successfully.");
 		}
 		resetSequence();
@@ -74,35 +79,76 @@ public class ReconnectLogic {
 		showToast(client, "Smart Auto Reconnect", "Reconnect attempts cancelled.");
 	}
 
+	// Jumps straight to a reconnect attempt: skips the rest of the current wait if one's in
+	// progress, or fires a single one-off attempt if the sequence already gave up (or was
+	// cancelled, or never started) - that one-off attempt schedules no further automatic retries
+	// of its own if it fails too.
+	public static void reconnectNow(Minecraft client) {
+		if (connecting || lastServerData == null) {
+			return;
+		}
+		if (ticksUntilNextAttempt >= 0) {
+			ticksUntilNextAttempt = 0;
+			return;
+		}
+		manualOneOff = true;
+		attemptsSoFar = DELAY_SECONDS.length;
+		if (attemptConnect(client)) {
+			connecting = true;
+		} else {
+			manualOneOff = false;
+		}
+	}
+
 	public static void tick(Minecraft client) {
 		if (pendingDisconnect) {
 			pendingDisconnect = false;
 			attemptsSoFar = 0;
+			connecting = false;
+			manualOneOff = false;
 			ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
 			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
 		}
+
+		if (connecting) {
+			if (client.level != null) {
+				// Actually succeeded - onJoin() handles (or already handled) resetting everything.
+				connecting = false;
+				return;
+			}
+			if (client.gui.screen() instanceof ConnectScreen) {
+				return; // still connecting - don't start any countdown until this resolves
+			}
+			connecting = false;
+			if (attemptsSoFar >= DELAY_SECONDS.length) {
+				giveUp(client);
+			} else {
+				ticksUntilNextAttempt = DELAY_SECONDS[attemptsSoFar] * 20;
+				showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + DELAY_SECONDS[attemptsSoFar] + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ").");
+			}
+			return;
+		}
+
 		if (ticksUntilNextAttempt < 0) {
 			return;
 		}
 		if (--ticksUntilNextAttempt > 0) {
 			return;
 		}
-		if (attemptsSoFar >= DELAY_SECONDS.length) {
-			giveUp(client);
-			return;
-		}
-		attemptConnect(client);
 		attemptsSoFar++;
-		ticksUntilNextAttempt = (attemptsSoFar < DELAY_SECONDS.length
-				? DELAY_SECONDS[attemptsSoFar]
-				: GIVE_UP_GRACE_SECONDS) * 20;
+		if (attemptConnect(client)) {
+			connecting = true;
+		}
 	}
 
-	private static void attemptConnect(Minecraft client) {
-		showToast(client, "Smart Auto Reconnect", "Attempting reconnect (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...");
+	private static boolean attemptConnect(Minecraft client) {
+		String attemptLabel = manualOneOff
+				? "manual retry"
+				: "attempt " + attemptsSoFar + "/" + DELAY_SECONDS.length;
+		showToast(client, "Smart Auto Reconnect", "Attempting reconnect (" + attemptLabel + ")...");
 		ServerAddress address = ServerAddress.parseString(lastServerData.ip);
 		if (address == null) {
-			return;
+			return false;
 		}
 		// Set before the connection attempt even starts (not on the later JOIN success) so it's
 		// already visible to every mod's JOIN listener by the time one actually fires, regardless
@@ -112,6 +158,7 @@ public class ReconnectLogic {
 		// each failed attempt's DisconnectedScreen onto the previous one's "Back" target, leaving
 		// a stack of error screens the player has to click through one at a time.
 		ConnectScreen.startConnecting(new TitleScreen(), client, address, lastServerData, false, null);
+		return true;
 	}
 
 	private static void giveUp(Minecraft client) {
@@ -136,23 +183,27 @@ public class ReconnectLogic {
 	private static void resetSequence() {
 		ticksUntilNextAttempt = -1;
 		attemptsSoFar = 0;
+		connecting = false;
+		manualOneOff = false;
 	}
 
-	// Used by DisconnectedScreenMixin to decide whether to show the status label/Cancel button.
-	// Includes pendingDisconnect, not just ticksUntilNextAttempt >= 0 - on the very first
-	// DisconnectedScreen after a fresh disconnect, tick() hasn't consumed that flag yet (the
-	// screen is already showing by the time the next client tick runs), so isRetrying() alone
-	// would still read false and the widgets would never appear on that first screen.
-	public static boolean willRetry() {
+	// Used by DisconnectedScreenMixin to decide whether to show the status label/Cancel button -
+	// only meaningful while an attempt is actually scheduled. The screen never appears while
+	// connecting == true (that's when ConnectScreen is up instead), so that state doesn't need
+	// to be handled here.
+	public static boolean isWaiting() {
 		return pendingDisconnect || ticksUntilNextAttempt >= 0;
+	}
+
+	// Used by DisconnectedScreenMixin to decide whether to show the Reconnect Now button - always
+	// available as long as there's a known server to reconnect to, regardless of sequence state.
+	public static boolean canReconnect() {
+		return lastServerData != null;
 	}
 
 	// Used by DisconnectedScreenMixin for the status label text, refreshed every screen tick so
 	// the countdown stays live.
 	public static String statusText() {
-		if (attemptsSoFar >= DELAY_SECONDS.length && ticksUntilNextAttempt >= 0) {
-			return "Giving up soon...";
-		}
 		int ticks = ticksUntilNextAttempt >= 0 ? ticksUntilNextAttempt : DELAY_SECONDS[0] * 20;
 		int secondsLeft = (ticks + 19) / 20;
 		return "Retrying in " + secondsLeft + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
