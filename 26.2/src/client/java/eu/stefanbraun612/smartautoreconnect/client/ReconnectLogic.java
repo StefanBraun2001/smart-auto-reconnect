@@ -33,6 +33,14 @@ public class ReconnectLogic {
 	private static int ticksUntilNextAttempt = -1; // -1 = no retry sequence in progress
 	private static int attemptsSoFar = 0;
 
+	// Set from onDisconnect(), consumed by tick(). Deliberately just a plain flag rather than
+	// scheduling work via Minecraft's own client.execute() task queue - for an involuntary
+	// disconnect, Minecraft.disconnect() calls dropAllTasks() moments after this event fires,
+	// which was silently wiping out a queued runnable (state update + toast) before it ever ran.
+	// tick() already runs reliably on the main thread every client tick regardless, so it just
+	// picks this up itself instead.
+	private static volatile boolean pendingDisconnect = false;
+
 	public static void onJoin(Minecraft client) {
 		lastServerData = client.getCurrentServer();
 		// The signal itself is set in attemptConnect(), not here - Fabric doesn't guarantee JOIN
@@ -52,15 +60,7 @@ public class ReconnectLogic {
 		if (!config.enabled || lastServerData == null) {
 			return;
 		}
-		// This event can fire off the main render thread (e.g. an involuntary disconnect detected
-		// by the network channel), so both the scheduling state and the toast call need to happen
-		// on the main thread - otherwise the toast silently never renders and the field writes race
-		// against tick() reading them every client tick.
-		client.execute(() -> {
-			attemptsSoFar = 0;
-			ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
-			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
-		});
+		pendingDisconnect = true;
 	}
 
 	// Manually cancels an in-progress retry sequence (e.g. known server maintenance) - bound to a
@@ -75,6 +75,12 @@ public class ReconnectLogic {
 	}
 
 	public static void tick(Minecraft client) {
+		if (pendingDisconnect) {
+			pendingDisconnect = false;
+			attemptsSoFar = 0;
+			ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
+			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
+		}
 		if (ticksUntilNextAttempt < 0) {
 			return;
 		}
