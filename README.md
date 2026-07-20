@@ -20,21 +20,52 @@ Needs Fabric Loader + **Fabric API**. Also install **Cloth Config API**
   exact method the pause-menu's Disconnect button calls - nothing else in
   the client calls it, so this is unambiguous.
 - On an involuntary disconnect, waits 30 seconds, then attempts to
-  reconnect to the same server. If that fails, waits 50 seconds and tries
-  again, then 70, then 90, then 110 - 5 attempts total, roughly 6 minutes
-  end to end - then gives up and notifies you (chat message + sound).
+  reconnect to the same server. If that attempt fails, waits 50 seconds
+  and tries again, then 70, then 90, then 110 - 5 attempts total - then
+  gives up and notifies you (toast + chat message + sound). Each gap is
+  measured from when an attempt actually concludes (success or failure),
+  not from when it started - a slow/hanging connection attempt (e.g. a
+  fully unreachable server taking a while to time out) doesn't eat into
+  the next attempt's wait.
 - Only applies to direct-connect/server-list multiplayer. Realms and LAN
   worlds are out of scope - there's no meaningful "reconnect" for either.
-- Config: a single **Enabled** toggle (default on).
+
+## Config
+
+- **Enabled** (default: on) - master switch.
+- **Notification mode**:
+  - **Toast only**: on-screen toast notifications for every stage
+    (disconnected, attempting, attempt failed, reconnected, gave up).
+  - **Toast and button** (default): the same toasts, plus extra widgets
+    added to the vanilla disconnect screen while relevant:
+    - A status label showing a live countdown ("Retrying in 47s
+      (attempt 2/5)...") and a **Cancel Auto-Reconnect** button, shown
+      whenever an attempt is scheduled.
+    - A **Reconnect Now** button, shown whenever there's a known server
+      to reconnect to. Mid-wait, it skips straight to the next attempt.
+      If the sequence already gave up (or was cancelled), it fires a
+      single one-off attempt instead - no further automatic retries get
+      scheduled if that one fails too.
+
+## Cancel keybind
+
+A "Cancel reconnect attempts" keybind is registered (ships **unbound** -
+bind it yourself under Controls) for stopping an in-progress retry
+sequence from anywhere, e.g. if you know the server's about to go down
+for maintenance. A client command wasn't viable for this since there's no
+chat box available on the disconnect/title screen where it's actually
+needed - the keybind and the disconnect-screen Cancel button both call the
+same logic.
 
 ## Integration with Smart Auto Attack / Smart Auto Mine
 
 If either of those mods is installed and was running when the disconnect
 happened, they'll notice a successful scripted reconnect (via a small
 reflection-based signal check - no hard dependency either way) and resume
-automatically after a 3-second settle buffer, regardless of their own
+automatically after a short settle buffer, regardless of their own
 "resume after manual reconnect" setting (which only governs reconnects
-*you* initiate yourself).
+*you* initiate yourself, including via this mod's own Reconnect Now
+button).
 
 ## AI disclosure
 
