@@ -8,4 +8,13 @@ import me.shedaniel.autoconfig.annotation.ConfigEntry;
 public class SmartAutoReconnectConfig implements ConfigData {
 	@ConfigEntry.Gui.Tooltip
 	public boolean enabled = true;
+
+	public enum NotificationMode {
+		TOAST_ONLY,
+		TOAST_AND_BUTTON
+	}
+
+	@ConfigEntry.Gui.Tooltip
+	@ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
+	public NotificationMode notificationMode = NotificationMode.TOAST_AND_BUTTON;
 }

@@ -131,4 +131,17 @@ public class ReconnectLogic {
 		ticksUntilNextAttempt = -1;
 		attemptsSoFar = 0;
 	}
+
+	// Used by DisconnectedScreenMixin to decide whether to show the status label/Cancel button.
+	public static boolean isRetrying() {
+		return ticksUntilNextAttempt >= 0;
+	}
+
+	// Used by DisconnectedScreenMixin for the status label text.
+	public static String statusText() {
+		if (attemptsSoFar >= DELAY_SECONDS.length) {
+			return "Giving up soon...";
+		}
+		return "Smart Auto Reconnect: retrying (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
+	}
 }

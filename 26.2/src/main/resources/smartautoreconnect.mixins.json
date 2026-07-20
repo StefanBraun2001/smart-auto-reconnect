@@ -4,6 +4,7 @@
 	"package": "eu.stefanbraun612.smartautoreconnect.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"DisconnectedScreenMixin",
 		"MinecraftDisconnectMixin"
 	],
 	"injectors": {
