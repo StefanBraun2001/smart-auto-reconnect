@@ -139,16 +139,22 @@ public class ReconnectLogic {
 	}
 
 	// Used by DisconnectedScreenMixin to decide whether to show the status label/Cancel button.
-	public static boolean isRetrying() {
-		return ticksUntilNextAttempt >= 0;
+	// Includes pendingDisconnect, not just ticksUntilNextAttempt >= 0 - on the very first
+	// DisconnectedScreen after a fresh disconnect, tick() hasn't consumed that flag yet (the
+	// screen is already showing by the time the next client tick runs), so isRetrying() alone
+	// would still read false and the widgets would never appear on that first screen.
+	public static boolean willRetry() {
+		return pendingDisconnect || ticksUntilNextAttempt >= 0;
 	}
 
-	// Used by DisconnectedScreenMixin for the status label text - kept short since the label is
-	// clipped (with a trailing "...") rather than wrapped once it runs out of horizontal room.
+	// Used by DisconnectedScreenMixin for the status label text, refreshed every screen tick so
+	// the countdown stays live.
 	public static String statusText() {
-		if (attemptsSoFar >= DELAY_SECONDS.length) {
+		if (attemptsSoFar >= DELAY_SECONDS.length && ticksUntilNextAttempt >= 0) {
 			return "Giving up soon...";
 		}
-		return "Retrying (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
+		int ticks = ticksUntilNextAttempt >= 0 ? ticksUntilNextAttempt : DELAY_SECONDS[0] * 20;
+		int secondsLeft = (ticks + 19) / 20;
+		return "Retrying in " + secondsLeft + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
 	}
 }

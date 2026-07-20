@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -28,6 +29,14 @@ public abstract class DisconnectedScreenMixin extends Screen {
 	@Final
 	private LinearLayout layout;
 
+	@Shadow
+	protected abstract void repositionElements();
+
+	@Unique
+	private StringWidget smartautoreconnect$statusLabel;
+	@Unique
+	private Button smartautoreconnect$cancelButton;
+
 	protected DisconnectedScreenMixin(Component title) {
 		super(title);
 	}
@@ -39,21 +48,37 @@ public abstract class DisconnectedScreenMixin extends Screen {
 		if (config.notificationMode != SmartAutoReconnectConfig.NotificationMode.TOAST_AND_BUTTON) {
 			return;
 		}
-		if (!ReconnectLogic.isRetrying()) {
+		if (!ReconnectLogic.willRetry()) {
 			return;
 		}
 
 		// Auto-sized to the text (no fixed width), so it can't clip - unlike the fixed-bounds
 		// StringWidget constructor, which clips text that doesn't fit rather than wrapping it.
-		StringWidget statusLabel = new StringWidget(Component.literal(ReconnectLogic.statusText()), this.font);
-		this.layout.addChild((LayoutElement) statusLabel);
+		this.smartautoreconnect$statusLabel = new StringWidget(Component.literal(ReconnectLogic.statusText()), this.font);
+		this.layout.addChild((LayoutElement) this.smartautoreconnect$statusLabel);
 
-		Button cancelButton = Button.builder(Component.literal("Cancel Auto-Reconnect"), button -> {
+		this.smartautoreconnect$cancelButton = Button.builder(Component.literal("Cancel Auto-Reconnect"), button -> {
 			ReconnectLogic.cancel(this.minecraft);
 			button.active = false;
 			button.setMessage(Component.literal("Cancelled"));
-			statusLabel.setMessage(Component.literal("Smart Auto Reconnect: cancelled."));
+			this.smartautoreconnect$statusLabel.setMessage(Component.literal("Smart Auto Reconnect: cancelled."));
+			this.layout.arrangeElements();
+			this.repositionElements();
 		}).width(200).build();
-		this.layout.addChild((LayoutElement) cancelButton);
+		this.layout.addChild((LayoutElement) this.smartautoreconnect$cancelButton);
+	}
+
+	@Override
+	public void tick() {
+		super.tick();
+		// Keeps the countdown live - the label's auto-sized width changes as the digit count
+		// changes ("in 9s" vs. "in 10s"), so the whole layout needs to re-arrange/re-center itself
+		// each time, not just have its text swapped in place.
+		if (this.smartautoreconnect$statusLabel != null && this.smartautoreconnect$cancelButton != null
+				&& this.smartautoreconnect$cancelButton.active) {
+			this.smartautoreconnect$statusLabel.setMessage(Component.literal(ReconnectLogic.statusText()));
+			this.layout.arrangeElements();
+			this.repositionElements();
+		}
 	}
 }
