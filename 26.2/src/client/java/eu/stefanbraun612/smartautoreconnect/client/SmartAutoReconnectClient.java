@@ -15,7 +15,7 @@ public class SmartAutoReconnectClient implements ClientModInitializer {
 		AutoConfig.register(SmartAutoReconnectConfig.class, GsonConfigSerializer::new);
 
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> ReconnectLogic.onJoin(client));
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ReconnectLogic.onDisconnect());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ReconnectLogic.onDisconnect(client));
 		ClientTickEvents.END_CLIENT_TICK.register(ReconnectLogic::tick);
 	}
 }

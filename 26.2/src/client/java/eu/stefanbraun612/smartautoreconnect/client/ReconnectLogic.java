@@ -3,6 +3,7 @@ package eu.stefanbraun612.smartautoreconnect.client;
 import eu.stefanbraun612.smartautoreconnect.client.config.SmartAutoReconnectConfig;
 import me.shedaniel.autoconfig.AutoConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -20,6 +21,10 @@ public class ReconnectLogic {
 	// How long to wait after the final attempt before declaring the whole sequence failed -
 	// there's no attempt afterward to naturally trigger this check, so it needs its own timer.
 	private static final int GIVE_UP_GRACE_SECONDS = 20;
+	// Toasts render on top of any screen (disconnect screen, title screen, ConnectScreen), unlike
+	// chat messages which only ever show up once back in a world's HUD - needed since the whole
+	// retry sequence happens while the player is stuck on exactly those screens.
+	private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId(6000L);
 
 	// Only ever set from a successful ClientPlayConnectionEvents.JOIN, so it always reflects
 	// a server actually reachable via the multiplayer server list/direct connect - null for
@@ -35,11 +40,12 @@ public class ReconnectLogic {
 		// that happens to land during the pre-first-attempt wait as a scripted one.
 		if (ticksUntilNextAttempt >= 0 && attemptsSoFar > 0) {
 			ReconnectSignal.lastAutoReconnectAtMillis = System.currentTimeMillis();
+			showToast(client, "Smart Auto Reconnect", "Reconnected successfully.");
 		}
 		resetSequence();
 	}
 
-	public static void onDisconnect() {
+	public static void onDisconnect(Minecraft client) {
 		if (VoluntaryDisconnectTracker.consumeVoluntary()) {
 			return;
 		}
@@ -49,6 +55,7 @@ public class ReconnectLogic {
 		}
 		attemptsSoFar = 0;
 		ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
+		showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
 	}
 
 	public static void tick(Minecraft client) {
@@ -70,6 +77,7 @@ public class ReconnectLogic {
 	}
 
 	private static void attemptConnect(Minecraft client) {
+		showToast(client, "Smart Auto Reconnect", "Attempting reconnect (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...");
 		ServerAddress address = ServerAddress.parseString(lastServerData.ip);
 		if (address == null) {
 			return;
@@ -80,8 +88,13 @@ public class ReconnectLogic {
 
 	private static void giveUp(Minecraft client) {
 		resetSequence();
-		client.gui.hud.getChat().addClientSystemMessage(Component.literal("Smart Auto Reconnect: gave up after 5 failed attempts."));
+		showToast(client, "Smart Auto Reconnect", "Gave up after " + DELAY_SECONDS.length + " failed attempts.");
+		client.gui.hud.getChat().addClientSystemMessage(Component.literal("Smart Auto Reconnect: gave up after " + DELAY_SECONDS.length + " failed attempts."));
 		playGiveUpSound(client);
+	}
+
+	private static void showToast(Minecraft client, String title, String message) {
+		SystemToast.addOrUpdate(client.gui.toastManager(), TOAST_ID, Component.literal(title), Component.literal(message));
 	}
 
 	private static void playGiveUpSound(Minecraft client) {
