@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "smartautoreconnect",
+	"version": "${version}",
+	"name": "Smart Auto Reconnect",
+	"description": "Automatically reconnects after an involuntary disconnect (server kick, timeout, connection loss) - not when you disconnect yourself. Up to 5 attempts, 30-110 second backoff.",
+	"authors": [
+		"Stefan Braun"
+	],
+	"contact": {},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"eu.stefanbraun612.smartautoreconnect.client.SmartAutoReconnectClient"
+		],
+		"modmenu": [
+			"eu.stefanbraun612.smartautoreconnect.client.SmartAutoReconnectModMenu"
+		]
+	},
+	"mixins": [
+		"smartautoreconnect.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"cloth-config2": "*"
+	}
+}
