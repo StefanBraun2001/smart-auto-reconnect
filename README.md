@@ -4,9 +4,10 @@ Client-side Fabric mod. Automatically reconnects after an **involuntary**
 disconnect (server kick, timeout, connection loss) - never when you press
 the pause-menu "Disconnect" button yourself.
 
-Current build: **A0.3** (alpha), MC **26.2** only. Grab a built jar from
+Current build: **A0.4** (alpha), MC **26.2** only. Grab a built jar from
 the [Releases](../../releases) page, or build from source with
-`./gradlew build` inside `26.2/`.
+`./gradlew build` inside `26.2/`. See [docs/GUIDE.md](docs/GUIDE.md) for
+a full walkthrough of every setting.
 
 ## Install
 
@@ -29,6 +30,12 @@ Needs Fabric Loader + **Fabric API**. Also install **Cloth Config API**
   the next attempt's wait.
 - Only applies to direct-connect/server-list multiplayer. Realms and LAN
   worlds are out of scope - there's no meaningful "reconnect" for either.
+- Tracks disconnects (not just retry attempts) in a rolling 5-minute
+  window. If more than 4 happen in that window - even if each individual
+  reconnect itself succeeds, just getting kicked again almost instantly
+  every time - it gives up on the whole retry sequence instead of looping
+  forever, since that pattern usually points to a client-side problem
+  (ban, crash loop, memory issue) rather than a normal server hiccup.
 
 ## Config
 
@@ -46,6 +53,9 @@ Needs Fabric Loader + **Fabric API**. Also install **Cloth Config API**
       If the sequence already gave up (or was cancelled), it fires a
       single one-off attempt instead - no further automatic retries get
       scheduled if that one fails too.
+- **Abort on rapid disconnect loop** (default: on) - see the 5-minute
+  window rule above. Turn off to always retry the normal 5-attempt
+  sequence no matter how often it happens.
 
 ## Cancel keybind
 
