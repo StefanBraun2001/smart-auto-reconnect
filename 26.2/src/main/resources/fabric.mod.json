@@ -7,7 +7,11 @@
 	"authors": [
 		"Stefan Braun"
 	],
-	"contact": {},
+	"contact": {
+		"homepage": "https://github.com/StefanBraun2001/smart-auto-reconnect/blob/master/docs/GUIDE.md",
+		"sources": "https://github.com/StefanBraun2001/smart-auto-reconnect",
+		"issues": "https://github.com/StefanBraun2001/smart-auto-reconnect/issues"
+	},
 	"license": "MIT",
 	"environment": "client",
 	"entrypoints": {

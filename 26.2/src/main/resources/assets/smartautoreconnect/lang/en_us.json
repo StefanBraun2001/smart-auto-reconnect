@@ -2,10 +2,13 @@
 	"text.autoconfig.smartautoreconnect.title": "Smart Auto Reconnect",
 
 	"text.autoconfig.smartautoreconnect.option.enabled": "Enabled",
-	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "When on (default), an involuntary disconnect (server kick, timeout, connection loss - not you pressing the Disconnect button yourself) triggers up to 5 reconnect attempts: 30 seconds after disconnecting, then 50, 70, 90, and 110 seconds after each failed attempt. Gives up and notifies you if all 5 fail. Only applies to direct-connect/server-list multiplayer, not Realms or LAN worlds.",
+	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "On (default): an involuntary disconnect (kick, timeout, connection loss) retries up to 5 times, 30-110s backoff. Direct-connect/server-list only, not Realms/LAN.",
 
 	"text.autoconfig.smartautoreconnect.option.notificationMode": "Notification mode",
-	"text.autoconfig.smartautoreconnect.option.notificationMode.@Tooltip": "TOAST_ONLY: just the on-screen toast notifications. TOAST_AND_BUTTON (default): also adds a status label and Cancel button to the disconnect screen while a retry sequence is active, so you can stop it (e.g. known server maintenance) without needing the cancel keybind.",
+	"text.autoconfig.smartautoreconnect.option.notificationMode.@Tooltip": "TOAST_ONLY: toasts only. TOAST_AND_BUTTON (default): also a Cancel button on the disconnect screen.",
+
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectGuardEnabled": "Abort on rapid disconnect loop",
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectGuardEnabled.@Tooltip": "On (default): give up entirely after 4+ disconnects within 5 minutes (reconnect-then-instant-kick usually means a client-side problem, not the server).",
 
 	"key.category.smartautoreconnect.main": "Smart Auto Reconnect",
 	"key.smartautoreconnect.cancel": "Cancel reconnect attempts"

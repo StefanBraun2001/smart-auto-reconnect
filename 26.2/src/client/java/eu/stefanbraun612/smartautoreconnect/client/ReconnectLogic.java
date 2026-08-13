@@ -14,6 +14,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class ReconnectLogic {
 	// Gap (seconds) before each successive attempt: 30, then +20 each time (50, 70, 90, 110).
 	private static final int[] DELAY_SECONDS = {30, 50, 70, 90, 110};
@@ -21,6 +24,15 @@ public class ReconnectLogic {
 	// chat messages which only ever show up once back in a world's HUD - needed since the whole
 	// retry sequence happens while the player is stuck on exactly those screens.
 	private static final SystemToast.SystemToastId TOAST_ID = new SystemToast.SystemToastId(6000L);
+
+	// Rapid-disconnect-loop guard: catches "reconnected fine, then kicked again almost instantly"
+	// repeating over and over - a pattern a normal server hiccup doesn't produce, but a client-side
+	// problem (ban, crash loop, memory issue) does. Tracked independently of the retry sequence
+	// itself (which resets attemptsSoFar back to 0 on every successful join), since otherwise this
+	// exact pattern would never accumulate a count at all.
+	private static final long RAPID_DISCONNECT_WINDOW_MILLIS = 5 * 60 * 1000L;
+	private static final int RAPID_DISCONNECT_LIMIT = 4; // more than this within the window aborts
+	private static final Deque<Long> recentDisconnectTimestamps = new ArrayDeque<>();
 
 	// Only ever set from a successful ClientPlayConnectionEvents.JOIN, so it always reflects
 	// a server actually reachable via the multiplayer server list/direct connect - null for
@@ -103,6 +115,16 @@ public class ReconnectLogic {
 	public static void tick(Minecraft client) {
 		if (pendingDisconnect) {
 			pendingDisconnect = false;
+
+			SmartAutoReconnectConfig config = AutoConfig.getConfigHolder(SmartAutoReconnectConfig.class).getConfig();
+			if (config.rapidDisconnectGuardEnabled && recordDisconnectAndCheckRapidLoop()) {
+				resetSequence();
+				recentDisconnectTimestamps.clear();
+				showToast(client, "Smart Auto Reconnect", "Aborted - disconnected " + (RAPID_DISCONNECT_LIMIT + 1) + "+ times within 5 minutes (likely a client-side issue, not the server).");
+				playGiveUpSound(client);
+				return;
+			}
+
 			attemptsSoFar = 0;
 			connecting = false;
 			manualOneOff = false;
@@ -202,6 +224,20 @@ public class ReconnectLogic {
 		if (sound != null) {
 			client.getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.0f));
 		}
+	}
+
+	// Records "now" as a disconnect and prunes anything outside the rolling window, then reports
+	// whether that pushed the count past the limit. Deliberately counts every involuntary
+	// disconnect that reaches this point (not just ones that end a retry sequence), since a
+	// disconnect right after a successful reconnect is exactly the pattern this guards against.
+	private static boolean recordDisconnectAndCheckRapidLoop() {
+		long now = System.currentTimeMillis();
+		recentDisconnectTimestamps.addLast(now);
+		while (!recentDisconnectTimestamps.isEmpty()
+				&& now - recentDisconnectTimestamps.peekFirst() > RAPID_DISCONNECT_WINDOW_MILLIS) {
+			recentDisconnectTimestamps.pollFirst();
+		}
+		return recentDisconnectTimestamps.size() > RAPID_DISCONNECT_LIMIT;
 	}
 
 	private static void resetSequence() {
