@@ -3,6 +3,7 @@ package eu.stefanbraun612.smartautoreconnect.client.mixin;
 import eu.stefanbraun612.smartautoreconnect.client.ReconnectLogic;
 import eu.stefanbraun612.smartautoreconnect.client.config.SmartAutoReconnectConfig;
 import me.shedaniel.autoconfig.AutoConfig;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.layouts.LayoutElement;
@@ -16,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 // Adds status/control widgets to the vanilla disconnect screen: a status label + Cancel button
@@ -77,6 +79,19 @@ public abstract class DisconnectedScreenMixin extends Screen {
 					button -> ReconnectLogic.reconnectNow(this.minecraft)).width(200).build();
 			this.layout.addChild((LayoutElement) reconnectNowButton);
 		}
+	}
+
+	// Vanilla's own "Back to Server List"/"Back to Title" button (built inline in init(), the only
+	// Gui.setScreen call this method makes) left a scheduled retry running silently in the
+	// background if the player used it instead of the mod's own Cancel Auto-Reconnect button -
+	// the countdown kept ticking off-screen and fired a reconnect attempt the player had already
+	// walked away from. Redirecting this call cancels any pending sequence right before the vanilla
+	// navigation actually happens, so leaving via either button behaves the same as hitting Cancel.
+	@Redirect(method = "init", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/Gui;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"))
+	private void smartautoreconnect$cancelOnVanillaBackButton(Gui gui, Screen screen) {
+		ReconnectLogic.cancel(this.minecraft);
+		gui.setScreen(screen);
 	}
 
 	@Override
