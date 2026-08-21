@@ -18,8 +18,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 public class ReconnectLogic {
-	// Gap (seconds) before each successive attempt: 30, then +20 each time (50, 70, 90, 110).
-	private static final int[] DELAY_SECONDS = {30, 50, 70, 90, 110};
 	// Toasts render on top of any screen (disconnect screen, title screen, ConnectScreen), unlike
 	// chat messages which only ever show up once back in a world's HUD - needed since the whole
 	// retry sequence happens while the player is stuck on exactly those screens.
@@ -29,9 +27,8 @@ public class ReconnectLogic {
 	// repeating over and over - a pattern a normal server hiccup doesn't produce, but a client-side
 	// problem (ban, crash loop, memory issue) does. Tracked independently of the retry sequence
 	// itself (which resets attemptsSoFar back to 0 on every successful join), since otherwise this
-	// exact pattern would never accumulate a count at all.
-	private static final long RAPID_DISCONNECT_WINDOW_MILLIS = 5 * 60 * 1000L;
-	private static final int RAPID_DISCONNECT_LIMIT = 4; // more than this within the window aborts
+	// exact pattern would never accumulate a count at all. Threshold/window are config-driven
+	// (A0.4.2) - see SmartAutoReconnectConfig.rapidDisconnectLimit/rapidDisconnectWindowSeconds.
 	private static final Deque<Long> recentDisconnectTimestamps = new ArrayDeque<>();
 
 	// Only ever set from a successful ClientPlayConnectionEvents.JOIN, so it always reflects
@@ -46,8 +43,8 @@ public class ReconnectLogic {
 	// a slow/hanging connection attempt (e.g. a dead server taking a long time to time out) can't
 	// eat into the next attempt's displayed delay.
 	private static boolean connecting = false;
-	// Distinguishes reconnectNow()'s one-off attempt (after already giving up) from a real 5th
-	// auto-attempt for toast wording - both set attemptsSoFar to DELAY_SECONDS.length.
+	// Distinguishes reconnectNow()'s one-off attempt (after already giving up) from a real final
+	// auto-attempt for toast wording - both set attemptsSoFar to config().retryAttempts.
 	private static boolean manualOneOff = false;
 
 	// Set from onDisconnect(), consumed by tick(). Deliberately just a plain flag rather than
@@ -69,11 +66,21 @@ public class ReconnectLogic {
 		resetSequence();
 	}
 
+	private static SmartAutoReconnectConfig config() {
+		return AutoConfig.getConfigHolder(SmartAutoReconnectConfig.class).getConfig();
+	}
+
+	// Delay before attempt (attemptIndex + 1), attemptIndex zero-based - reproduces the original
+	// hardcoded 30/50/70/90/110 sequence when initialRetryDelaySeconds=30, increment=20.
+	private static int delaySeconds(int attemptIndex, SmartAutoReconnectConfig config) {
+		return config.initialRetryDelaySeconds + attemptIndex * config.retryDelayIncrementSeconds;
+	}
+
 	public static void onDisconnect(Minecraft client) {
 		if (VoluntaryDisconnectTracker.consumeVoluntary()) {
 			return;
 		}
-		SmartAutoReconnectConfig config = AutoConfig.getConfigHolder(SmartAutoReconnectConfig.class).getConfig();
+		SmartAutoReconnectConfig config = config();
 		if (!config.enabled || lastServerData == null) {
 			return;
 		}
@@ -104,7 +111,7 @@ public class ReconnectLogic {
 			return;
 		}
 		manualOneOff = true;
-		attemptsSoFar = DELAY_SECONDS.length;
+		attemptsSoFar = config().retryAttempts;
 		if (!attemptConnect(client)) {
 			manualOneOff = false;
 		}
@@ -114,11 +121,11 @@ public class ReconnectLogic {
 		if (pendingDisconnect) {
 			pendingDisconnect = false;
 
-			SmartAutoReconnectConfig config = AutoConfig.getConfigHolder(SmartAutoReconnectConfig.class).getConfig();
-			if (config.rapidDisconnectGuardEnabled && recordDisconnectAndCheckRapidLoop()) {
+			SmartAutoReconnectConfig config = config();
+			if (config.rapidDisconnectGuardEnabled && recordDisconnectAndCheckRapidLoop(config)) {
 				resetSequence();
 				recentDisconnectTimestamps.clear();
-				showToast(client, "Smart Auto Reconnect", "Aborted - disconnected " + (RAPID_DISCONNECT_LIMIT + 1) + "+ times within 5 minutes (likely a client-side issue, not the server).");
+				showToast(client, "Smart Auto Reconnect", "Aborted - disconnected " + (config.rapidDisconnectLimit + 1) + "+ times within " + formatDuration(config.rapidDisconnectWindowSeconds) + " (likely a client-side issue, not the server).");
 				playGiveUpSound(client);
 				return;
 			}
@@ -126,8 +133,8 @@ public class ReconnectLogic {
 			attemptsSoFar = 0;
 			connecting = false;
 			manualOneOff = false;
-			ticksUntilNextAttempt = DELAY_SECONDS[0] * 20;
-			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + DELAY_SECONDS[0] + "s (attempt 1/" + DELAY_SECONDS.length + ").");
+			ticksUntilNextAttempt = delaySeconds(0, config) * 20;
+			showToast(client, "Smart Auto Reconnect", "Disconnected - retrying in " + delaySeconds(0, config) + "s (attempt 1/" + config.retryAttempts + ").");
 		}
 
 		resolveConnectingIfNeeded(client);
@@ -167,7 +174,8 @@ public class ReconnectLogic {
 			return; // still connecting - don't start any countdown until this resolves
 		}
 		connecting = false;
-		if (attemptsSoFar >= DELAY_SECONDS.length) {
+		SmartAutoReconnectConfig config = config();
+		if (attemptsSoFar >= config.retryAttempts) {
 			if (manualOneOff) {
 				// Not a real give-up (attemptsSoFar only reads as "maxed out" because
 				// reconnectNow() reuses that value for its one-off attempt) - reusing giveUp()'s
@@ -176,18 +184,18 @@ public class ReconnectLogic {
 				resetSequence();
 				showToast(client, "Smart Auto Reconnect", "Manual reconnect attempt failed.");
 			} else {
-				giveUp(client);
+				giveUp(client, config);
 			}
 		} else {
-			ticksUntilNextAttempt = DELAY_SECONDS[attemptsSoFar] * 20;
-			showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + DELAY_SECONDS[attemptsSoFar] + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ").");
+			ticksUntilNextAttempt = delaySeconds(attemptsSoFar, config) * 20;
+			showToast(client, "Smart Auto Reconnect", "Attempt failed - retrying in " + delaySeconds(attemptsSoFar, config) + "s (attempt " + (attemptsSoFar + 1) + "/" + config.retryAttempts + ").");
 		}
 	}
 
 	private static boolean attemptConnect(Minecraft client) {
 		String attemptLabel = manualOneOff
 				? "manual retry"
-				: "attempt " + attemptsSoFar + "/" + DELAY_SECONDS.length;
+				: "attempt " + attemptsSoFar + "/" + config().retryAttempts;
 		showToast(client, "Smart Auto Reconnect", "Attempting reconnect (" + attemptLabel + ")...");
 		ServerAddress address = ServerAddress.parseString(lastServerData.ip);
 		if (address == null) {
@@ -209,14 +217,24 @@ public class ReconnectLogic {
 		return true;
 	}
 
-	private static void giveUp(Minecraft client) {
+	private static void giveUp(Minecraft client, SmartAutoReconnectConfig config) {
 		resetSequence();
-		showToast(client, "Smart Auto Reconnect", "Gave up after " + DELAY_SECONDS.length + " failed attempts.");
+		showToast(client, "Smart Auto Reconnect", "Gave up after " + config.retryAttempts + " failed attempts.");
 		playGiveUpSound(client);
 	}
 
 	private static void showToast(Minecraft client, String title, String message) {
 		SystemToast.addOrUpdate(client.gui.toastManager(), TOAST_ID, Component.literal(title), Component.literal(message));
+	}
+
+	// Minutes for whole multiples of 60s (matches the original hardcoded "5 minutes" wording),
+	// seconds otherwise - keeps the abort toast readable across arbitrary configured windows.
+	private static String formatDuration(int seconds) {
+		if (seconds >= 60 && seconds % 60 == 0) {
+			int minutes = seconds / 60;
+			return minutes + (minutes == 1 ? " minute" : " minutes");
+		}
+		return seconds + "s";
 	}
 
 	private static void playGiveUpSound(Minecraft client) {
@@ -231,14 +249,15 @@ public class ReconnectLogic {
 	// whether that pushed the count past the limit. Deliberately counts every involuntary
 	// disconnect that reaches this point (not just ones that end a retry sequence), since a
 	// disconnect right after a successful reconnect is exactly the pattern this guards against.
-	private static boolean recordDisconnectAndCheckRapidLoop() {
+	private static boolean recordDisconnectAndCheckRapidLoop(SmartAutoReconnectConfig config) {
 		long now = System.currentTimeMillis();
 		recentDisconnectTimestamps.addLast(now);
+		long windowMillis = config.rapidDisconnectWindowSeconds * 1000L;
 		while (!recentDisconnectTimestamps.isEmpty()
-				&& now - recentDisconnectTimestamps.peekFirst() > RAPID_DISCONNECT_WINDOW_MILLIS) {
+				&& now - recentDisconnectTimestamps.peekFirst() > windowMillis) {
 			recentDisconnectTimestamps.pollFirst();
 		}
-		return recentDisconnectTimestamps.size() > RAPID_DISCONNECT_LIMIT;
+		return recentDisconnectTimestamps.size() > config.rapidDisconnectLimit;
 	}
 
 	private static void resetSequence() {
@@ -274,8 +293,9 @@ public class ReconnectLogic {
 	// Used by DisconnectedScreenMixin for the status label text, refreshed every screen tick so
 	// the countdown stays live.
 	public static String statusText() {
-		int ticks = ticksUntilNextAttempt >= 0 ? ticksUntilNextAttempt : DELAY_SECONDS[0] * 20;
+		SmartAutoReconnectConfig config = config();
+		int ticks = ticksUntilNextAttempt >= 0 ? ticksUntilNextAttempt : delaySeconds(0, config) * 20;
 		int secondsLeft = (ticks + 19) / 20;
-		return "Retrying in " + secondsLeft + "s (attempt " + (attemptsSoFar + 1) + "/" + DELAY_SECONDS.length + ")...";
+		return "Retrying in " + secondsLeft + "s (attempt " + (attemptsSoFar + 1) + "/" + config.retryAttempts + ")...";
 	}
 }

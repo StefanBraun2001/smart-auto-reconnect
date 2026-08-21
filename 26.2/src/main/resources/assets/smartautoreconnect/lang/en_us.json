@@ -1,14 +1,33 @@
 {
 	"text.autoconfig.smartautoreconnect.title": "Smart Auto Reconnect",
 
+	"text.autoconfig.smartautoreconnect.category.general": "General",
+	"text.autoconfig.smartautoreconnect.category.retry": "Retry Attempts",
+	"text.autoconfig.smartautoreconnect.category.safeguard": "Reconnect-Loop Safeguard",
+
 	"text.autoconfig.smartautoreconnect.option.enabled": "Enabled",
-	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "On (default): an involuntary disconnect (kick, timeout, connection loss) retries up to 5 times, 30-110s backoff. Direct-connect/server-list only, not Realms/LAN.",
+	"text.autoconfig.smartautoreconnect.option.enabled.@Tooltip": "On (default): an involuntary disconnect (kick, timeout, connection loss) retries per the settings on the Retry Attempts tab. Direct-connect/server-list only, not Realms/LAN.",
 
 	"text.autoconfig.smartautoreconnect.option.notificationMode": "Notification mode",
 	"text.autoconfig.smartautoreconnect.option.notificationMode.@Tooltip": "TOAST_ONLY: toasts only. TOAST_AND_BUTTON (default): also a Cancel button on the disconnect screen.",
 
+	"text.autoconfig.smartautoreconnect.option.retryAttempts": "Retry attempts",
+	"text.autoconfig.smartautoreconnect.option.retryAttempts.@Tooltip": "How many times to retry before giving up (default: 5).",
+
+	"text.autoconfig.smartautoreconnect.option.initialRetryDelaySeconds": "Time until first retry (seconds)",
+	"text.autoconfig.smartautoreconnect.option.initialRetryDelaySeconds.@Tooltip": "Delay before the first reconnect attempt (default: 30).",
+
+	"text.autoconfig.smartautoreconnect.option.retryDelayIncrementSeconds": "Delay increment (seconds)",
+	"text.autoconfig.smartautoreconnect.option.retryDelayIncrementSeconds.@Tooltip": "Added to the delay before each subsequent attempt (default: 20, e.g. 30/50/70/90/110s for 5 attempts).",
+
 	"text.autoconfig.smartautoreconnect.option.rapidDisconnectGuardEnabled": "Abort on rapid disconnect loop",
-	"text.autoconfig.smartautoreconnect.option.rapidDisconnectGuardEnabled.@Tooltip": "On (default): give up entirely after 4+ disconnects within 5 minutes (reconnect-then-instant-kick usually means a client-side problem, not the server).",
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectGuardEnabled.@Tooltip": "On (default): give up entirely once the threshold below is hit (reconnect-then-instant-kick usually means a client-side problem, not the server).",
+
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectLimit": "Disconnect threshold",
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectLimit.@Tooltip": "More than this many disconnects within the time window below triggers the safeguard (default: 4).",
+
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectWindowSeconds": "Time window (seconds)",
+	"text.autoconfig.smartautoreconnect.option.rapidDisconnectWindowSeconds.@Tooltip": "Rolling window the disconnect threshold above is counted over (default: 300 = 5 minutes).",
 
 	"key.category.smartautoreconnect.main": "Smart Auto Reconnect",
 	"key.smartautoreconnect.cancel": "Cancel reconnect attempts"
