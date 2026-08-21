@@ -3,7 +3,6 @@ package eu.stefanbraun612.smartautoreconnect.client.mixin;
 import eu.stefanbraun612.smartautoreconnect.client.ReconnectLogic;
 import eu.stefanbraun612.smartautoreconnect.client.config.SmartAutoReconnectConfig;
 import me.shedaniel.autoconfig.AutoConfig;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.layouts.LayoutElement;
@@ -17,7 +16,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 // Adds status/control widgets to the vanilla disconnect screen: a status label + Cancel button
@@ -81,17 +79,25 @@ public abstract class DisconnectedScreenMixin extends Screen {
 		}
 	}
 
-	// Vanilla's own "Back to Server List"/"Back to Title" button (built inline in init(), the only
-	// Gui.setScreen call this method makes) left a scheduled retry running silently in the
-	// background if the player used it instead of the mod's own Cancel Auto-Reconnect button -
-	// the countdown kept ticking off-screen and fired a reconnect attempt the player had already
-	// walked away from. Redirecting this call cancels any pending sequence right before the vanilla
-	// navigation actually happens, so leaving via either button behaves the same as hitting Cancel.
-	@Redirect(method = "init", at = @At(value = "INVOKE",
-			target = "Lnet/minecraft/client/gui/Gui;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"))
-	private void smartautoreconnect$cancelOnVanillaBackButton(Gui gui, Screen screen) {
-		ReconnectLogic.cancel(this.minecraft);
-		gui.setScreen(screen);
+	// Vanilla's own "Back to Server List"/"Back to Title" button left a scheduled retry running
+	// silently in the background if the player used it instead of the mod's own Cancel
+	// Auto-Reconnect button - the countdown kept ticking off-screen and fired a reconnect attempt
+	// the player had already walked away from. removed() fires (synchronously, via Screen.removed())
+	// whenever this screen stops being the active one, for ANY reason - including our own
+	// attemptConnect() swapping in a ConnectScreen for a legitimate scheduled/manual attempt, which
+	// must NOT be cancelled here. ReconnectLogic.isConnecting() is set true by attemptConnect()
+	// before it triggers that screen swap specifically so this can tell the two cases apart: true
+	// means "we're the ones navigating away", false means the player (or another mod) did.
+	// A tried-first @Redirect on the vanilla button's own Gui.setScreen(...) call failed at runtime
+	// (Mixin injection error, 0 targets found in init()) - decompiling the shipped class showed that
+	// call actually lives inside a synthetic lambda body (lambda$init$3/4), not in init() itself, so
+	// this lifecycle-based approach was used instead of chasing compiler-generated lambda names.
+	@Override
+	public void removed() {
+		if (!ReconnectLogic.isConnecting()) {
+			ReconnectLogic.cancel(this.minecraft);
+		}
+		super.removed();
 	}
 
 	@Override

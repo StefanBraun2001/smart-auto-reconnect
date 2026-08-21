@@ -105,9 +105,7 @@ public class ReconnectLogic {
 		}
 		manualOneOff = true;
 		attemptsSoFar = DELAY_SECONDS.length;
-		if (attemptConnect(client)) {
-			connecting = true;
-		} else {
+		if (!attemptConnect(client)) {
 			manualOneOff = false;
 		}
 	}
@@ -144,9 +142,7 @@ public class ReconnectLogic {
 			return;
 		}
 		attemptsSoFar++;
-		if (attemptConnect(client)) {
-			connecting = true;
-		}
+		attemptConnect(client);
 	}
 
 	// A failed connection attempt has no equivalent to pendingDisconnect - there's no event fired
@@ -201,6 +197,11 @@ public class ReconnectLogic {
 		// already visible to every mod's JOIN listener by the time one actually fires, regardless
 		// of cross-mod listener order.
 		ReconnectSignal.lastAutoReconnectAtMillis = System.currentTimeMillis();
+		// Set before startConnecting() swaps the screen (not after it returns) - DisconnectedScreenMixin's
+		// removed() hook reads this flag to tell "we're the ones navigating away" from "the player did,
+		// via a vanilla button" apart, and Screen.removed() fires synchronously as part of the screen
+		// swap below, not on some later tick.
+		connecting = true;
 		// Always a fresh TitleScreen, never the currently-shown screen - reusing it would chain
 		// each failed attempt's DisconnectedScreen onto the previous one's "Back" target, leaving
 		// a stack of error screens the player has to click through one at a time.
@@ -259,6 +260,15 @@ public class ReconnectLogic {
 	// available as long as there's a known server to reconnect to, regardless of sequence state.
 	public static boolean canReconnect() {
 		return lastServerData != null;
+	}
+
+	// Used by DisconnectedScreenMixin's removed() hook to tell apart "this screen is going away
+	// because we ourselves just started a scheduled/manual attempt" (connecting was set true in
+	// attemptConnect() before the screen swap that triggers removed()) from "the player navigated
+	// away some other way" (vanilla back button, another mod's screen, etc.) - only the latter
+	// should cancel a pending sequence.
+	public static boolean isConnecting() {
+		return connecting;
 	}
 
 	// Used by DisconnectedScreenMixin for the status label text, refreshed every screen tick so
