@@ -20,6 +20,7 @@ public class SmartAutoReconnectClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		AutoConfig.register(SmartAutoReconnectConfig.class, GsonConfigSerializer::new);
+		SmartAutoReconnectSounds.init();
 
 		KeyMapping.Category category = KeyMapping.Category.register(
 				Identifier.fromNamespaceAndPath(MOD_ID, "main"));

@@ -11,6 +11,12 @@
 	"text.autoconfig.smartautoreconnect.option.notificationMode": "Notification mode",
 	"text.autoconfig.smartautoreconnect.option.notificationMode.@Tooltip": "TOAST_ONLY: toasts only. TOAST_AND_BUTTON (default): also a Cancel button on the disconnect screen.",
 
+	"text.autoconfig.smartautoreconnect.option.playSoundOnAutoStop": "Play sound on give up",
+	"text.autoconfig.smartautoreconnect.option.playSoundOnAutoStop.@Tooltip": "On (default): play a sound whenever the mod gives up on reconnecting (out of attempts, or the rapid-disconnect-loop safeguard triggered).",
+
+	"text.autoconfig.smartautoreconnect.option.autoStopSound": "Give-up sound",
+	"text.autoconfig.smartautoreconnect.option.autoStopSound.@Tooltip": "Sound event ID, e.g. minecraft:block.bell.use.",
+
 	"text.autoconfig.smartautoreconnect.option.retryAttempts": "Retry attempts",
 	"text.autoconfig.smartautoreconnect.option.retryAttempts.@Tooltip": "How many times to retry before giving up (default: 5).",
 

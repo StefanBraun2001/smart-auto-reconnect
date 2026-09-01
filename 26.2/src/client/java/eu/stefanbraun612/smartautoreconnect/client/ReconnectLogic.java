@@ -8,11 +8,7 @@ import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.sounds.SoundEvent;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -238,11 +234,11 @@ public class ReconnectLogic {
 	}
 
 	private static void playGiveUpSound(Minecraft client) {
-		Identifier id = Identifier.tryParse("minecraft:block.bell.use");
-		SoundEvent sound = id == null ? null : BuiltInRegistries.SOUND_EVENT.getValue(id);
-		if (sound != null) {
-			client.getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.0f));
+		SmartAutoReconnectConfig config = config();
+		if (!config.playSoundOnAutoStop) {
+			return;
 		}
+		SoundUtil.play(client, config.autoStopSound);
 	}
 
 	// Records "now" as a disconnect and prunes anything outside the rolling window, then reports

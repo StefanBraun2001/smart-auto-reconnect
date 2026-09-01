@@ -14,6 +14,9 @@ public class SmartAutoReconnectConfig implements ConfigData {
 
 	public NotificationMode notificationMode = NotificationMode.TOAST_AND_BUTTON;
 
+	public boolean playSoundOnAutoStop = true;
+	public String autoStopSound = "smartautoreconnect:auto_stop"; // full sound event ID - bundled twin-bell ring, or any other valid sound event ID
+
 	// Attempt N's delay (seconds) = initialRetryDelaySeconds + (N-1) * retryDelayIncrementSeconds.
 	// Defaults reproduce the original hardcoded sequence: 30, 50, 70, 90, 110.
 	public int retryAttempts = 5;

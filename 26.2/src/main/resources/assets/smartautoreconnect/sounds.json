@@ -1,0 +1,7 @@
+{
+	"auto_stop": {
+		"sounds": [
+			"smartautoreconnect:auto_stop"
+		]
+	}
+}

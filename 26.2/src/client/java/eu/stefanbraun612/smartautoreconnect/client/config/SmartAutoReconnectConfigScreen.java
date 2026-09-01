@@ -60,6 +60,22 @@ public class SmartAutoReconnectConfigScreen {
 				.setSaveConsumer(v -> config.notificationMode = v)
 				.build());
 
+		BooleanListEntry playSoundOnAutoStop = entryBuilder
+				.startBooleanToggle(option("playSoundOnAutoStop"), config.playSoundOnAutoStop)
+				.setDefaultValue(defaults.playSoundOnAutoStop)
+				.setTooltip(tooltip("playSoundOnAutoStop"))
+				.setSaveConsumer(v -> config.playSoundOnAutoStop = v)
+				.build();
+		general.addEntry(playSoundOnAutoStop);
+
+		general.addEntry(entryBuilder
+				.startStrField(option("autoStopSound"), config.autoStopSound)
+				.setDefaultValue(defaults.autoStopSound)
+				.setTooltip(tooltip("autoStopSound"))
+				.setSaveConsumer(v -> config.autoStopSound = v)
+				.setDisplayRequirement(Requirement.isTrue(playSoundOnAutoStop))
+				.build());
+
 		// --- Retry Attempts tab ---
 
 		ConfigCategory retry = builder.getOrCreateCategory(category("retry"));
