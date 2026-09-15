@@ -10,7 +10,6 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 public class SmartAutoReconnectClient implements ClientModInitializer {
 	public static final String MOD_ID = "smartautoreconnect";
@@ -27,8 +26,8 @@ public class SmartAutoReconnectClient implements ClientModInitializer {
 
 		cancelKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.smartautoreconnect.cancel",
-				InputConstants.Type.KEYSYM,
-				GLFW.GLFW_KEY_UNKNOWN,
+				InputConstants.Type.KEYBOARD,
+				InputConstants.UNKNOWN.getValue(),
 				category
 		));
 

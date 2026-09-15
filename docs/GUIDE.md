@@ -1,13 +1,14 @@
 # Smart Auto Reconnect - Detailed Guide
 
-A client-side Fabric mod for MC 26.2 that automatically reconnects you
+A client-side Fabric mod for MC 26.3 that automatically reconnects you
 after an **involuntary** disconnect - a kick, a timeout, a dropped
 connection. It never fires when you disconnect yourself via the pause
-menu.
+menu. (Older 26.2 builds remain available on the Releases page for anyone
+still on that version.)
 
 ## Installation
 
-1. Install Fabric Loader for MC 26.2.
+1. Install Fabric Loader for MC 26.3.
 2. Install **Fabric API**.
 3. Install **Cloth Config API** (required - the config screen depends on it).
 4. Optionally install **Mod Menu** for an in-game config entry point;
