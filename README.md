@@ -8,7 +8,7 @@ Current build: **A0.4.3** (alpha), MC **26.3** only (older 26.2 builds
 remain available on the [Releases](../../releases) page for anyone still
 on that version). Grab a built jar from the
 [Releases](../../releases) page, or build from source with
-`./gradlew build` inside `26.3/`. See [docs/GUIDE.md](docs/GUIDE.md) for
+`./gradlew build` inside `26.3/` (needs JDK 25). See [docs/GUIDE.md](docs/GUIDE.md) for
 a full walkthrough of every setting.
 
 **GitHub-only, not on Modrinth.** A subsequent, silent change to
